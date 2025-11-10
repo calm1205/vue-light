@@ -1,0 +1,83 @@
+name: Publish npm package
+
+# npm packageのpublishを行うworkflow
+
+# 以下を実行する
+# 1. バージョンを更新
+# 2. ビルド
+# 3. バージョンタグをpush
+# 4. Github Packagesにpublish
+# 5. Github上にリリースを作成
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: Select version bump (patch/minor/major)
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish npm package
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_SCOPED_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@calm1205'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set git user (github-actions[bot])
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update version
+        run: npm version ${{ inputs.release_type }}
+
+      - name: Build
+        run: npm run build
+
+      - name: Set up push with GITHUB_TOKEN
+        run: |
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
+      - name: Push version
+        run: git push --follow-tags
+
+      - name: Publish to npm
+        run: |
+          npm publish --tag latest
+
+      - name: Resolve tag
+        id: tags
+        run: |
+          VERSION=$(npm pkg get version | tr -d '"')
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ steps.tags.outputs.tag }}
+          name: ${{ steps.tags.outputs.tag }}
+          generate_release_notes: true
