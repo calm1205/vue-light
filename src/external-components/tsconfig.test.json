@@ -1,9 +1,0 @@
-{
-  "extends": "./tsconfig.packages.json",
-  "compilerOptions": {
-    "composite": false,
-    "types": ["node", "vitest"]
-  },
-  "include": ["packages/**/*.test.ts", "packages/**/*.d.ts"],
-  "exclude": []
-}
